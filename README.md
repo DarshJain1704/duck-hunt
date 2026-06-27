@@ -46,6 +46,14 @@ Ensure your hand is fully visible to your webcam. The tracking is mirrored so mo
 *   **Audio**: Web Audio API (Synthesizer) + YouTube Player IFrame API (BGM).
 *   **Fonts**: Google Fonts (`Press Start 2P`).
 
+## 🌐 Live Demo
+
+The game is deployed and fully playable on GitHub Pages!
+
+👉 **Play it here: [https://darshjain1704.github.io/duck-hunt/](https://darshjain1704.github.io/duck-hunt/)**
+
+*(Note: The game requires webcam permission to track your hand. Ensure you grant webcam access when prompted).*
+
 ---
 
 ## 🚀 Running Locally
