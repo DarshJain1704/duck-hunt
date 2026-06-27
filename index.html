@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Duck Hunt Revamped — 8-Bit Hand Tracking Game</title>
+  <meta name="description" content="A retro NES Duck Hunt reimagining with real-time hand tracking via your webcam. No install required." />
+
+  <!-- Google Font: Press Start 2P for authentic 8-bit typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="app">
+    <div id="game-container">
+
+      <!-- Hidden webcam element (MediaPipe reads from this) -->
+      <video id="webcam" autoplay playsinline muted></video>
+
+      <!-- Main game canvas (640×480) -->
+      <canvas id="gameCanvas" width="640" height="480"></canvas>
+
+      <!-- ── HTML overlay: all clickable UI elements ── -->
+      <div id="ui-overlay">
+
+        <!-- Loading screen -->
+        <div id="loading-screen" class="screen">
+          <!-- canvas handles the loading render; this is just the z-layer placeholder -->
+        </div>
+
+        <!-- Menu buttons -->
+        <div id="menu-buttons" class="screen hidden">
+          <button id="start-btn" class="pixel-btn primary">▶ START GAME</button>
+          <a id="github-link" href="https://github.com/DarshJain1704" target="_blank">GITHUB: DarshJain1704</a>
+        </div>
+
+        <!-- In-game HUD controls -->
+        <div id="game-hud" class="screen hidden">
+          <!-- Mute and fullscreen are always visible; rendered in game-controls -->
+        </div>
+
+        <!-- Round complete -->
+        <div id="round-buttons" class="screen hidden">
+          <button id="next-round-btn" class="pixel-btn primary">▶ NEXT ROUND</button>
+        </div>
+
+        <!-- Game over -->
+        <div id="gameover-buttons" class="screen hidden">
+          <button id="restart-btn"  class="pixel-btn primary">▶ PLAY AGAIN</button>
+          <button id="menu-btn"     class="pixel-btn secondary">◀ MENU</button>
+        </div>
+
+        <!-- Always-visible controls (mute BGM, mute SFX, fullscreen) -->
+        <div id="game-controls">
+          <button id="sfx-btn"        class="icon-btn screen hidden" title="Mute SFX">SFX</button>
+          <button id="bgm-btn"        class="icon-btn screen hidden" title="Mute BGM">BGM</button>
+          <button id="fullscreen-btn" class="icon-btn screen hidden" title="Fullscreen">FULL</button>
+        </div>
+
+        <!-- Error message -->
+        <div id="error-msg" class="hidden error-toast"></div>
+
+      </div><!-- /ui-overlay -->
+
+    </div><!-- /game-container -->
+  </div><!-- /app -->
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
