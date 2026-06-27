@@ -245,19 +245,25 @@ export function drawCrosshair(ctx, x, y, state) {
   ctx.restore();
 
   // Status text
+  const CW = 640;
+  const CH = 480;
   if (state === 'NO_HAND') {
     ctx.save();
     ctx.fillStyle = '#FF4444';
     ctx.font = '8px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('HAND NOT DETECTED', x, y + R + 18);
+    const textX = Math.max(75, Math.min(CW - 75, x));
+    const textY = y + R + 18 > CH - 15 ? y - R - 12 : y + R + 18;
+    ctx.fillText('HAND NOT DETECTED', textX, textY);
     ctx.restore();
   } else if (state === 'NO_PISTOL') {
     ctx.save();
     ctx.fillStyle = '#888';
     ctx.font = '7px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('MAKE GUN GESTURE', x, y + R + 18);
+    const textX = Math.max(70, Math.min(CW - 70, x));
+    const textY = y + R + 18 > CH - 15 ? y - R - 12 : y + R + 18;
+    ctx.fillText('MAKE GUN GESTURE', textX, textY);
     ctx.restore();
   }
 }
