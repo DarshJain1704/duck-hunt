@@ -8,8 +8,10 @@ const DEBOUNCE_MS     = 280;    // ms between shots
 const SNAP_DIST_THRESHOLD  = 0.09;   // normalized units — "close enough" to fire
 const SNAP_DELTA_THRESHOLD = 0.035;  // minimum rapid decrease to count as snap
 
-// Recoil-jerk trigger: index tip jerks upward abruptly
-const JERK_THRESHOLD  = 0.055;   // normalized units/frame
+// Index-curl trigger: index finger curls inward (tip toward palm) — like pulling a trigger
+// We track (L5.y - L8.y): large positive = finger extended; small/negative = finger curled
+const CURL_EXTENDED_MIN   = 0.07;  // must be this extended before watching for curl
+const CURL_DROP_THRESHOLD = 0.04;  // how fast the extension must collapse to register
 
 class GestureController {
   constructor() {
@@ -20,6 +22,7 @@ class GestureController {
     // Raw history ring-buffers
     this._rawPos   = Array(RING_SIZE).fill({ x: 0.5, y: 0.5 });
     this._snapHist = Array(RING_SIZE).fill(1.0);
+    this._curlHist = Array(RING_SIZE).fill(0.15);  // extension distance history
 
     this._lastShotMs = 0;
 
@@ -50,7 +53,6 @@ class GestureController {
     const L0  = landmarks[0];   // WRIST
     const L4  = landmarks[4];   // THUMB TIP
     const L5  = landmarks[5];   // INDEX MCP
-    const L6  = landmarks[6];   // INDEX PIP
     const L8  = landmarks[8];   // INDEX TIP
     const L9  = landmarks[9];   // MIDDLE MCP
     const L12 = landmarks[12];  // MIDDLE TIP
@@ -63,7 +65,7 @@ class GestureController {
     const mirX = 1 - L8.x;
     const rawY = L8.y;
 
-    // ── Update ring buffers ────────────────────────────────────────
+    // ── Update position ring buffer ────────────────────────────────
     this._rawPos.push({ x: mirX, y: rawY });
     if (this._rawPos.length > RING_SIZE) this._rawPos.shift();
 
@@ -73,7 +75,8 @@ class GestureController {
 
     // ── Pistol gesture detection ───────────────────────────────────
     // Index clearly extended (tip well above MCP)
-    const indexExtended = (L5.y - L8.y) > 0.08;
+    const extensionDist = L5.y - L8.y;
+    const indexExtended = extensionDist > 0.08;
 
     // Middle / Ring / Pinky closed (tips below or near their MCPs)
     const middleClosed = L12.y > L9.y  - 0.03;
@@ -85,19 +88,24 @@ class GestureController {
 
     this.isPistol = indexExtended && middleClosed && ringClosed && pinkyClosed && thumbFarFromPalm;
 
+    // Always update curl history for a clean baseline (even when not in pistol mode)
+    this._curlHist.push(extensionDist);
+    if (this._curlHist.length > RING_SIZE) this._curlHist.shift();
+
     if (!this.isPistol) return;
 
     // ── Debounce check ─────────────────────────────────────────────
     if (timestamp - this._lastShotMs < DEBOUNCE_MS) return;
 
     // ── Shot Trigger 1: Thumb-snap ─────────────────────────────────
+    // Thumb tip rapidly approaches index tip
     const snapDist = this._dist(L4, L8);
     this._snapHist.push(snapDist);
     if (this._snapHist.length > RING_SIZE) this._snapHist.shift();
 
     const recentSnap = avg(this._snapHist.slice(-2));
     const prevSnap   = avg(this._snapHist.slice(-6, -2));
-    const snapDelta  = prevSnap - recentSnap; // positive = finger got closer
+    const snapDelta  = prevSnap - recentSnap; // positive = thumb got closer to index
 
     if (snapDelta > SNAP_DELTA_THRESHOLD && recentSnap < SNAP_DIST_THRESHOLD) {
       this.shotFired   = true;
@@ -105,16 +113,18 @@ class GestureController {
       return;
     }
 
-    // ── Shot Trigger 2: Recoil jerk (index tip jerks upward) ──────
-    if (this._rawPos.length >= 6) {
-      const recentY = avg(this._rawPos.slice(-2).map(p => p.y));
-      const prevY   = avg(this._rawPos.slice(-6, -2).map(p => p.y));
-      const jerk    = prevY - recentY;  // positive = moved up (y decreases upward)
+    // ── Shot Trigger 2: Index finger curl (trigger pull) ──────────
+    // A rapid collapse in (L5.y - L8.y) means the index finger curled inward —
+    // exactly like pulling a real trigger. This is RELATIVE motion (finger vs. palm)
+    // so arm sway and positional movement won't cause false positives.
+    const recentCurl = avg(this._curlHist.slice(-2));
+    const prevCurl   = avg(this._curlHist.slice(-5, -2));
+    const curlDrop   = prevCurl - recentCurl; // positive = extension distance collapsed
 
-      if (jerk > JERK_THRESHOLD) {
-        this.shotFired   = true;
-        this._lastShotMs = timestamp;
-      }
+    // Only fire if finger was clearly extended before, then curled sharply
+    if (prevCurl > CURL_EXTENDED_MIN && curlDrop > CURL_DROP_THRESHOLD) {
+      this.shotFired   = true;
+      this._lastShotMs = timestamp;
     }
   }
 
