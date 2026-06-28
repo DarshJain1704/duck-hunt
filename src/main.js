@@ -44,6 +44,8 @@ class App {
     this.currentRound   = 1;
     this.isNewHighScore = false;
     this.initError      = null;
+    this._scale         = 1;    // CSS scale factor (updated in _scaleGame)
+    this._hoveredBtn    = null; // currently highlighted HTML button
 
     // DOM elements
     this._els = {
@@ -67,12 +69,50 @@ class App {
   _scaleGame() {
     const container = document.getElementById('game-container');
     const scale     = Math.min(window.innerWidth / CW, window.innerHeight / CH);
+    this._scale     = scale;   // store for crosshair hit-testing
     const offX      = (window.innerWidth  - CW * scale) / 2;
     const offY      = (window.innerHeight - CH * scale) / 2;
     container.style.transform       = `scale(${scale})`;
     container.style.transformOrigin = 'top left';
     container.style.left            = `${offX}px`;
     container.style.top             = `${offY}px`;
+  }
+
+  // ─── Map canvas coords → screen coords, find hovered button ────
+  _updateButtonHover(canvasX, canvasY, shot) {
+    // Convert canvas position to screen position
+    const container = document.getElementById('game-container');
+    const cr        = container.getBoundingClientRect();
+    // canvas is 640×480 but rendered at _scale
+    const screenX   = cr.left + canvasX * this._scale;
+    const screenY   = cr.top  + canvasY * this._scale;
+
+    // Determine which buttons are currently interactive
+    const candidates = [];
+    if (this.state === STATES.MENU)           candidates.push(document.getElementById('start-btn'));
+    if (this.state === STATES.ROUND_COMPLETE) candidates.push(document.getElementById('next-round-btn'));
+    if (this.state === STATES.GAME_OVER) {
+      candidates.push(document.getElementById('restart-btn'));
+      candidates.push(document.getElementById('menu-btn'));
+    }
+
+    // Clear previous hover
+    if (this._hoveredBtn) {
+      this._hoveredBtn.classList.remove('crosshair-hover');
+      this._hoveredBtn = null;
+    }
+
+    for (const btn of candidates) {
+      if (!btn) continue;
+      const r = btn.getBoundingClientRect();
+      if (screenX >= r.left && screenX <= r.right &&
+          screenY >= r.top  && screenY <= r.bottom) {
+        this._hoveredBtn = btn;
+        btn.classList.add('crosshair-hover');
+        if (shot) btn.click();   // fire!
+        break;
+      }
+    }
   }
 
   // ─── Button bindings ─────────────────────────────────────────────
@@ -275,7 +315,16 @@ class App {
         break;
       }
 
-      // MENU / ROUND_COMPLETE / GAME_OVER — no tick logic needed
+      // MENU / ROUND_COMPLETE / GAME_OVER — check button hover + shoot
+      case STATES.MENU:
+      case STATES.ROUND_COMPLETE:
+      case STATES.GAME_OVER:
+        if (isPistol) this._updateButtonHover(pos.x, pos.y, shot);
+        else if (this._hoveredBtn) {
+          this._hoveredBtn.classList.remove('crosshair-hover');
+          this._hoveredBtn = null;
+        }
+        break;
     }
 
     // ── Render ──────────────────────────────────────────────────────
