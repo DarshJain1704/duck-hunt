@@ -1,17 +1,14 @@
 // gestures.js — Pistol gesture detection, cursor smoothing, shot trigger
 
-const LERP_FACTOR     = 0.28;   // cursor smoothing (0=sticky, 1=instant)
-const RING_SIZE       = 8;      // raw position history buffer length
-const DEBOUNCE_MS     = 280;    // ms between shots
+const LERP_FACTOR  = 0.28;   // cursor smoothing (0=sticky, 1=instant)
+const RING_SIZE    = 8;      // raw position history buffer length
+const DEBOUNCE_MS  = 300;    // ms between shots
 
-// Thumb-snap trigger: thumb tip approaches index tip rapidly
-const SNAP_DIST_THRESHOLD  = 0.09;   // normalized units — "close enough" to fire
-const SNAP_DELTA_THRESHOLD = 0.035;  // minimum rapid decrease to count as snap
+// Aim: track index KNUCKLE (L5/MCP) instead of fingertip (L8)
+// → the knuckle doesn't move when you pinch, so aim stays locked during firing
 
-// Index-curl trigger: index finger curls inward (tip toward palm) — like pulling a trigger
-// We track (L5.y - L8.y): large positive = finger extended; small/negative = finger curled
-const CURL_EXTENDED_MIN   = 0.07;  // must be this extended before watching for curl
-const CURL_DROP_THRESHOLD = 0.04;  // how fast the extension must collapse to register
+// Pinch trigger: thumb tip (L4) touches index tip (L8)
+const PINCH_THRESHOLD = 0.07;  // normalized distance — "touching"
 
 class GestureController {
   constructor() {
@@ -19,17 +16,14 @@ class GestureController {
     this.cursorX = 0.5;
     this.cursorY = 0.5;
 
-    // Raw history ring-buffers
-    this._rawPos   = Array(RING_SIZE).fill({ x: 0.5, y: 0.5 });
-    this._snapHist = Array(RING_SIZE).fill(1.0);
-    this._curlHist = Array(RING_SIZE).fill(0.15);  // extension distance history
-
-    this._lastShotMs = 0;
+    // Shot state
+    this._lastShotMs  = 0;
+    this._wasPinching = false;  // edge detection: fire on entry, not while held
 
     // Exported state
-    this.shotFired  = false;
-    this.isPistol   = false;
-    this.hasHand    = false;
+    this.shotFired = false;
+    this.isPistol  = false;
+    this.hasHand   = false;
   }
 
   // ─── Euclidean distance between two landmarks ──────────────────
@@ -42,18 +36,18 @@ class GestureController {
     this.shotFired = false;
 
     if (!landmarks || landmarks.length < 21) {
-      this.hasHand = false;
-      this.isPistol = false;
+      this.hasHand      = false;
+      this.isPistol     = false;
+      this._wasPinching = false;
       return;
     }
 
     this.hasHand = true;
 
     // ── Named landmarks ────────────────────────────────────────────
-    const L0  = landmarks[0];   // WRIST
     const L4  = landmarks[4];   // THUMB TIP
-    const L5  = landmarks[5];   // INDEX MCP
-    const L8  = landmarks[8];   // INDEX TIP
+    const L5  = landmarks[5];   // INDEX MCP (knuckle) ← AIM POINT
+    const L8  = landmarks[8];   // INDEX TIP           ← trigger reference
     const L9  = landmarks[9];   // MIDDLE MCP
     const L12 = landmarks[12];  // MIDDLE TIP
     const L13 = landmarks[13];  // RING MCP
@@ -61,71 +55,47 @@ class GestureController {
     const L17 = landmarks[17];  // PINKY MCP
     const L20 = landmarks[20];  // PINKY TIP
 
-    // ── Mirror x (front camera is flipped) ────────────────────────
-    const mirX = 1 - L8.x;
-    const rawY = L8.y;
-
-    // ── Update position ring buffer ────────────────────────────────
-    this._rawPos.push({ x: mirX, y: rawY });
-    if (this._rawPos.length > RING_SIZE) this._rawPos.shift();
+    // ── Aim using INDEX KNUCKLE (L5) — stable during pinch ────────
+    const mirX = 1 - L5.x;   // mirror: front camera is flipped
+    const rawY = L5.y;
 
     // ── Lerp smoothed cursor ───────────────────────────────────────
     this.cursorX += (mirX - this.cursorX) * LERP_FACTOR;
     this.cursorY += (rawY - this.cursorY) * LERP_FACTOR;
 
-    // ── Pistol gesture detection ───────────────────────────────────
-    // Index clearly extended (tip well above MCP)
-    const extensionDist = L5.y - L8.y;
-    const indexExtended = extensionDist > 0.08;
+    // ── Pistol gesture gate ────────────────────────────────────────
+    // Index clearly extended (tip well above knuckle)
+    const indexExtended = (L5.y - L8.y) > 0.08;
 
     // Middle / Ring / Pinky closed (tips below or near their MCPs)
     const middleClosed = L12.y > L9.y  - 0.03;
     const ringClosed   = L16.y > L13.y - 0.03;
     const pinkyClosed  = L20.y > L17.y - 0.03;
 
-    // Thumb extended away from palm (not tucked)
-    const thumbFarFromPalm = this._dist(L4, L0) > this._dist(landmarks[3], L0) * 0.88;
+    // NOTE: thumb is NOT part of the gate — it's the trigger variable now
+    this.isPistol = indexExtended && middleClosed && ringClosed && pinkyClosed;
 
-    this.isPistol = indexExtended && middleClosed && ringClosed && pinkyClosed && thumbFarFromPalm;
+    // ── Pinch state ────────────────────────────────────────────────
+    const pinchDist  = this._dist(L4, L8);
+    const isPinching = pinchDist < PINCH_THRESHOLD;
 
-    // Always update curl history for a clean baseline (even when not in pistol mode)
-    this._curlHist.push(extensionDist);
-    if (this._curlHist.length > RING_SIZE) this._curlHist.shift();
-
-    if (!this.isPistol) return;
-
-    // ── Debounce check ─────────────────────────────────────────────
-    if (timestamp - this._lastShotMs < DEBOUNCE_MS) return;
-
-    // ── Shot Trigger 1: Thumb-snap ─────────────────────────────────
-    // Thumb tip rapidly approaches index tip
-    const snapDist = this._dist(L4, L8);
-    this._snapHist.push(snapDist);
-    if (this._snapHist.length > RING_SIZE) this._snapHist.shift();
-
-    const recentSnap = avg(this._snapHist.slice(-2));
-    const prevSnap   = avg(this._snapHist.slice(-6, -2));
-    const snapDelta  = prevSnap - recentSnap; // positive = thumb got closer to index
-
-    if (snapDelta > SNAP_DELTA_THRESHOLD && recentSnap < SNAP_DIST_THRESHOLD) {
-      this.shotFired   = true;
-      this._lastShotMs = timestamp;
+    if (!this.isPistol) {
+      // Reset pinch state when hand leaves pistol mode
+      this._wasPinching = isPinching;
       return;
     }
 
-    // ── Shot Trigger 2: Index finger curl (trigger pull) ──────────
-    // A rapid collapse in (L5.y - L8.y) means the index finger curled inward —
-    // exactly like pulling a real trigger. This is RELATIVE motion (finger vs. palm)
-    // so arm sway and positional movement won't cause false positives.
-    const recentCurl = avg(this._curlHist.slice(-2));
-    const prevCurl   = avg(this._curlHist.slice(-5, -2));
-    const curlDrop   = prevCurl - recentCurl; // positive = extension distance collapsed
-
-    // Only fire if finger was clearly extended before, then curled sharply
-    if (prevCurl > CURL_EXTENDED_MIN && curlDrop > CURL_DROP_THRESHOLD) {
-      this.shotFired   = true;
-      this._lastShotMs = timestamp;
+    // ── Shot trigger: pinch ENTRY (edge detection) ─────────────────
+    // Fire on the TRANSITION from not-pinching → pinching.
+    // Holding the pinch does NOT continuously fire.
+    if (isPinching && !this._wasPinching) {
+      if (timestamp - this._lastShotMs >= DEBOUNCE_MS) {
+        this.shotFired   = true;
+        this._lastShotMs = timestamp;
+      }
     }
+
+    this._wasPinching = isPinching;
   }
 
   // ─── Public accessors ─────────────────────────────────────────────
@@ -140,11 +110,6 @@ class GestureController {
   getShotFired()  { return this.shotFired; }
   getHasHand()    { return this.hasHand;   }
   getIsPistol()   { return this.isPistol;  }
-}
-
-function avg(arr) {
-  if (arr.length === 0) return 0;
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
 export const gestures = new GestureController();
