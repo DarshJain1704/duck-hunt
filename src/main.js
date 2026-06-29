@@ -282,8 +282,19 @@ class App {
           audio.playShot();
 
           const result = this.game.shoot(pos.x, pos.y);
-          if (result === 'HIT')  { audio.playHit(); if (this.game.combo > 1) audio.playCombo(); }
-          if (result === 'MISS') { audio.playMiss(); audio.playDogLaugh(); }
+          if (result === 'HIT') {
+            audio.playHit();
+            if (this.game.comboLegend) {
+              // Combo legend: 5-hit streak — rainbow burst from screen center
+              this.game.spawnComboLegendBurst(CW / 2, CH / 2);
+              audio.playComboLegend();
+            } else if (this.game.combo > 1) {
+              audio.playCombo();
+            }
+          }
+          if (result === 'MISS')    { audio.playMiss(); audio.playDogLaugh(); }
+          if (result === 'DOG_HIT') { audio.playDogScared(); }
+          if (result === 'FREEZE')  { audio.playTimeFreeze(); }
         }
 
         this.game.update(dt);
@@ -353,6 +364,12 @@ class App {
 
         // Dog
         this.game.dog.draw(ctx);
+
+        // Freeze power-up icon (shoot it to collect)
+        R.drawFreezePowerup(ctx, this.game.freezePowerup);
+
+        // Freeze blue tint overlay (active after collecting)
+        R.drawFreezeOverlay(ctx, this.game.freezeTimer, CW, CH);
 
         // Particles + floating texts
         R.drawParticles(ctx, this.game.particles);

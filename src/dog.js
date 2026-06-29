@@ -11,21 +11,40 @@ export class Dog {
     this.peekY   = canvasH - 140;          // visible position
     this.x       = canvasW * 0.15 - 36;   // bottom left area
     this.y       = this.restY;
-    this.state   = 'HIDDEN';   // HIDDEN | RISING | LAUGHING | DESCENDING
+    this.state   = 'HIDDEN';   // HIDDEN | RISING | LAUGHING | SCARED | DESCENDING
     this.timer   = 0;
     this.animFrame  = 0;
     this.animTimer  = 0;
     this.onDone     = null;    // optional callback when animation finishes
+    this.wasShot    = false;   // true when player shot the dog
   }
 
   show(onDone = null) {
-    this.y      = this.restY;
-    this.state  = 'RISING';
-    this.timer  = 0;
-    this.onDone = onDone;
+    this.y       = this.restY;
+    this.state   = 'RISING';
+    this.timer   = 0;
+    this.wasShot = false;
+    this.onDone  = onDone;
   }
 
-  isHidden() { return this.state === 'HIDDEN'; }
+  isHidden()  { return this.state === 'HIDDEN'; }
+  isLaughing(){ return this.state === 'LAUGHING'; }
+
+  /** Returns true if the shot (cx,cy) hits the visible dog */
+  checkHit(cx, cy) {
+    if (this.state !== 'LAUGHING') return false;
+    // Dog head bounding box: roughly 72×110 px at (this.x, this.y)
+    return cx >= this.x && cx <= this.x + 72 &&
+           cy >= this.y && cy <= this.y + 110;
+  }
+
+  /** Trigger the "scared" flee animation */
+  scare() {
+    if (this.state !== 'LAUGHING') return;
+    this.wasShot = true;
+    this.state   = 'SCARED';
+    this.timer   = 0;
+  }
 
   update(dt) {
     // Animate frames
@@ -49,6 +68,16 @@ export class Dog {
         this.timer += dt;
         if (this.timer >= LAUGH_DURATION) {
           this.state = 'DESCENDING';
+        }
+        break;
+
+      case 'SCARED':
+        // Flee downward very fast
+        this.y += DOG_RISE_SPEED * 2.5 * dt;
+        if (this.y >= this.restY) {
+          this.y  = this.restY;
+          this.state = 'HIDDEN';
+          if (this.onDone) this.onDone();
         }
         break;
 

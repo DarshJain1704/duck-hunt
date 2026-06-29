@@ -26,12 +26,13 @@ export class Duck {
    * @param {number} speed   - base speed in canvas-px / frame @ 60fps
    * @param {string} pattern - one of PATTERNS
    */
-  constructor(canvasW, canvasH, speed, pattern = PATTERNS.ZIGZAG) {
-    this.canvasW = canvasW;
-    this.canvasH = canvasH;
-    this.speed   = speed;
-    this.pattern = pattern;
-    this.state   = DUCK_STATES.FLYING;
+  constructor(canvasW, canvasH, speed, pattern = PATTERNS.ZIGZAG, isGolden = false) {
+    this.canvasW  = canvasW;
+    this.canvasH  = canvasH;
+    this.speed    = speed * (isGolden ? 1.4 : 1.0);   // golden ducks are 40% faster
+    this.pattern  = pattern;
+    this.state    = DUCK_STATES.FLYING;
+    this.isGolden = isGolden;
 
     // Spawn at bottom, random horizontal position
     this.x  = 80 + Math.random() * (canvasW - 160);
@@ -39,8 +40,8 @@ export class Duck {
 
     // Initial upward velocity
     const hDir = Math.random() < 0.5 ? 1 : -1;
-    this.vx = hDir * speed * (0.6 + Math.random() * 0.4);
-    this.vy = -speed * (0.9 + Math.random() * 0.3);
+    this.vx = hDir * this.speed * (0.6 + Math.random() * 0.4);
+    this.vy = -this.speed * (0.9 + Math.random() * 0.3);
 
     this.direction   = this.vx >= 0 ? 'RIGHT' : 'LEFT';
 

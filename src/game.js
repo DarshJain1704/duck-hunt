@@ -33,22 +33,27 @@ export class Game {
     this.round           = 1;
     this.bullets         = MAX_BULLETS;
     this.combo           = 0;
-    this.comboTimer      = 0;   // how long to display combo label
+    this.comboTimer      = 0;
+    this.comboLegend     = false;   // true for one frame when combo hits 5
     this.ducksHit        = 0;
     this.shotsFired      = 0;
     this.currentDucks    = [];
     this.particles       = [];
     this.floatingTexts   = [];
     this.ducksInRound    = 0;
-    this.ducksSpawned    = 0;   // total spawned this round
+    this.ducksSpawned    = 0;
     this.encounterNum    = 0;
     this.duckTimer       = 0;
     this.interludeTimer  = 0;
     this.config          = null;
-    this.encounterState  = 'IDLE'; // IDLE | ACTIVE | ENCOUNTER_HIT | ENCOUNTER_MISS | INTERLUDE
+    this.encounterState  = 'IDLE';
     this._pendingGameOver = false;
     this._gameOver        = false;
     this._roundComplete   = false;
+    // ── Time freeze power-up ────────────────────────────────────────
+    this.freezeTimer      = 0;     // seconds remaining of freeze effect
+    this.freezePowerup    = null;  // { x, y, timer } — floating icon on screen
+    this._freezeCooldown  = 0;     // so we don't spawn another immediately
   }
 
   reset() {
@@ -79,10 +84,13 @@ export class Game {
     }
 
     const { speed, pattern, twoAtOnce } = this.config;
-    this.currentDucks = [new Duck(this.canvasW, this.canvasH, speed, pattern)];
+
+    // 1-in-8 chance of a golden duck (not on two-at-once to avoid chaos)
+    const golden = !twoAtOnce && Math.random() < 0.125;
+    this.currentDucks = [new Duck(this.canvasW, this.canvasH, speed, pattern, golden)];
 
     if (twoAtOnce && remaining > 1) {
-      this.currentDucks.push(new Duck(this.canvasW, this.canvasH, speed, pattern));
+      this.currentDucks.push(new Duck(this.canvasW, this.canvasH, speed, pattern, false));
     }
 
     this.ducksSpawned  += this.currentDucks.length;
@@ -90,6 +98,18 @@ export class Game {
     this.bullets        = MAX_BULLETS;
     this.duckTimer      = 0;
     this.encounterState = 'ACTIVE';
+
+    // Occasionally spawn a freeze power-up (after encounter 2, ~30% chance, 1 per spawn window)
+    if (this.encounterNum > 2 && this._freezeCooldown <= 0 &&
+        Math.random() < 0.30 && !this.freezePowerup) {
+      this.freezePowerup = {
+        x:     120 + Math.random() * (this.canvasW - 240),
+        y:     80  + Math.random() * 180,
+        timer: 6.0,   // disappears after 6s if not collected
+      };
+      this._freezeCooldown = 20; // encounters before next powerup can appear
+    }
+    if (this._freezeCooldown > 0) this._freezeCooldown--;
   }
 
   // ─── Shoot — called from main loop when shot gesture fires ────────
@@ -101,10 +121,43 @@ export class Game {
    *   NONE = shot ignored (wrong state)
    */
   shoot(cx, cy) {
+    // ── Dog hit (easter egg) ────────────────────────────────────────
+    if (this.dog.checkHit(cx, cy)) {
+      this.dog.scare();
+      const bonus = 200;
+      this.score += bonus;
+      this.floatingTexts.push({
+        x: this.dog.x + 36, y: this.dog.y - 10,
+        text: `+${bonus} BAD DOG!`, maxTimer: 1.8, timer: 1.8,
+      });
+      this._spawnParticles(this.dog.x + 36, this.dog.y + 45, ['#FF4444','#FFD700','#FFA500']);
+      return 'DOG_HIT';
+    }
+
     if (this.encounterState !== 'ACTIVE' || this.bullets <= 0) return 'NONE';
 
     this.bullets--;
     this.shotsFired++;
+
+    // ── Freeze power-up hit ─────────────────────────────────────────
+    if (this.freezePowerup) {
+      const fp = this.freezePowerup;
+      const r  = 22;
+      if (Math.abs(cx - fp.x) < r && Math.abs(cy - fp.y) < r) {
+        this.freezePowerup = null;
+        this.freezeTimer   = 5.0;  // 5 seconds of slow-mo
+        this.floatingTexts.push({
+          x: fp.x, y: fp.y - 10,
+          text: 'TIME FREEZE!', maxTimer: 1.5, timer: 1.5,
+        });
+        
+        // Refund bullet so player isn't penalized for collecting it
+        this.bullets++;
+        this.shotsFired--;
+        
+        return 'FREEZE';
+      }
+    }
 
     // Check hit on each flying duck
     let hitAny = false;
@@ -114,27 +167,34 @@ export class Game {
         hitAny         = true;
         this.ducksHit++;
         this.combo++;
-        this.comboTimer = 1.8;
+        this.comboTimer  = 1.8;
+        this.comboLegend = (this.combo === 5);  // fire combo legend at exactly 5
 
-        // Score: base + round bonus + bullet bonus + combo bonus
-        const base        = 100 + (this.round - 1) * 50;
-        const bulletBonus = this.bullets === 2 ? 1.5 : this.bullets === 1 ? 1.0 : 0.75;
-        const comboBonus  = Math.min(this.combo * 0.4, 2.5);
-        const points      = Math.floor(base * bulletBonus * (1 + comboBonus - 0.4));
+        // Score: golden duck = 500 flat, else base + bonuses
+        let points;
+        if (duck.isGolden) {
+          points = 500;
+        } else {
+          const base        = 100 + (this.round - 1) * 50;
+          const bulletBonus = this.bullets === 2 ? 1.5 : this.bullets === 1 ? 1.0 : 0.75;
+          const comboBonus  = Math.min(this.combo * 0.4, 2.5);
+          points = Math.floor(base * bulletBonus * (1 + comboBonus - 0.4));
+        }
 
         this.score += points;
 
-        // Floating score text
+        const label = duck.isGolden ? `✨ +${points} GOLDEN!` : `+${points}`;
         this.floatingTexts.push({
-          x: duck.x + 32,
-          y: duck.y,
-          text: `+${points}`,
-          maxTimer: 1.2,
-          timer: 1.2,
+          x: duck.x + 32, y: duck.y,
+          text: label, maxTimer: 1.4, timer: 1.4,
         });
 
-        // Burst particles
-        this._spawnParticles(duck.x + 32, duck.y + 24);
+        this._spawnParticles(
+          duck.x + 32, duck.y + 24,
+          duck.isGolden
+            ? ['#FFD700','#FFF8A0','#FFA500','#FFFFFF']
+            : ['#FFD700','#FFFFFF','#FF4444','#00FF41','#FFA500']
+        );
       }
     }
 
@@ -177,7 +237,7 @@ export class Game {
     if (this._gameOver || this._roundComplete) return;
 
     this.dog.update(dt);
-    this.currentDucks.forEach(d => d.update(dt));
+    // Ducks are updated inside the switch cases below (with freeze scaling applied)
 
     // Floating texts
     this.floatingTexts = this.floatingTexts.filter(t => {
@@ -197,12 +257,22 @@ export class Game {
 
     // Combo display decay
     if (this.comboTimer > 0) this.comboTimer -= dt;
+    this.comboLegend = false;   // reset each frame (only true for exactly 1 frame)
+
+    // Freeze power-up tick
+    if (this.freezeTimer > 0) this.freezeTimer -= dt;
+    if (this.freezePowerup) {
+      this.freezePowerup.timer -= dt;
+      if (this.freezePowerup.timer <= 0) this.freezePowerup = null;
+    }
 
     switch (this.encounterState) {
       case 'ACTIVE': {
-        this.duckTimer += dt;
+        this.duckTimer += this.freezeTimer > 0 ? 0 : dt;  // freeze pauses timer
+        const freezeDt  = this.freezeTimer > 0 ? dt * 0.2 : dt;
+        this.currentDucks.forEach(d => d.update(freezeDt));
         const flyingDucks = this.currentDucks.filter(d => d.state === DUCK_STATES.FLYING);
-        // Timeout → miss
+        // Timeout → miss (only when not frozen)
         if (flyingDucks.length > 0 && this.duckTimer >= this.config.timeout) {
           this._triggerMiss();
         }
@@ -210,6 +280,7 @@ export class Game {
       }
 
       case 'ENCOUNTER_HIT': {
+        this.currentDucks.forEach(d => d.update(dt));
         // Wait for all ducks to finish their fall animation
         const allDone = this.currentDucks.every(
           d => d.state === DUCK_STATES.DONE || d.state === DUCK_STATES.ESCAPED
@@ -222,6 +293,7 @@ export class Game {
       }
 
       case 'ENCOUNTER_MISS': {
+        this.currentDucks.forEach(d => d.update(dt));
         // Wait for dog animation to finish
         if (this.dog.isHidden()) {
           if (this._pendingGameOver) {
@@ -234,6 +306,7 @@ export class Game {
       }
 
       case 'INTERLUDE': {
+        this.currentDucks.forEach(d => d.update(dt));
         this.interludeTimer -= dt;
         if (this.interludeTimer <= 0) {
           this._spawnEncounter();
@@ -244,27 +317,44 @@ export class Game {
   }
 
   // ─── Hit burst particles ──────────────────────────────────────────
-  _spawnParticles(cx, cy) {
-    const count  = 10;
-    const colors = ['#FFD700', '#FFFFFF', '#FF4444', '#00FF41', '#FFA500'];
+  _spawnParticles(cx, cy, colors = ['#FFD700','#FFFFFF','#FF4444','#00FF41','#FFA500']) {
+    const count = 10;
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i / count) + Math.random() * 0.6;
       const speed = 90 + Math.random() * 110;
       this.particles.push({
-        x:      cx,
-        y:      cy,
-        vx:     Math.cos(angle) * speed,
-        vy:     Math.sin(angle) * speed - 60,
-        timer:  0.45 + Math.random() * 0.2,
-        color:  colors[Math.floor(Math.random() * colors.length)],
-        size:   2 + Math.random() * 3,
+        x:     cx,
+        y:     cy,
+        vx:    Math.cos(angle) * speed,
+        vy:    Math.sin(angle) * speed - 60,
+        timer: 0.45 + Math.random() * 0.2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size:  2 + Math.random() * 3,
       });
     }
   }
 
-  // ─── Getters ─────────────────────────────────────────────────────
+  /** Spawn a large rainbow burst for combo legend */
+  spawnComboLegendBurst(cx, cy) {
+    const rainbow = ['#FF0000','#FF7700','#FFFF00','#00FF41','#0088FF','#8800FF','#FF00FF'];
+    for (let i = 0; i < 30; i++) {
+      const angle = (Math.PI * 2 * i / 30) + Math.random() * 0.4;
+      const speed = 140 + Math.random() * 180;
+      this.particles.push({
+        x:     cx,
+        y:     cy,
+        vx:    Math.cos(angle) * speed,
+        vy:    Math.sin(angle) * speed - 80,
+        timer: 0.7 + Math.random() * 0.4,
+        color: rainbow[i % rainbow.length],
+        size:  3 + Math.random() * 4,
+      });
+    }
+  }
+
   get isGameOver()     { return this._gameOver;     }
   get isRoundComplete(){ return this._roundComplete; }
+  get freezeActive()   { return this.freezeTimer > 0; }
   get accuracy() {
     if (this.shotsFired === 0) return 100;
     return Math.round((this.ducksHit / this.shotsFired) * 100);

@@ -180,6 +180,31 @@ export function drawDuck(ctx, duck) {
   const isDead = duck.state === DUCK_STATES.HIT || duck.state === DUCK_STATES.FALLING;
   _drawDuckLocal(ctx, duck.animFrame, isDead);
 
+  // Golden tint overlay — warm gold multiply-ish effect
+  if (duck.isGolden) {
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(255,210,0,0.52)';
+    ctx.fillRect(0, 0, 64, 48);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Sparkle dots around the duck
+    ctx.restore();
+    ctx.save();
+    const sparks = 4;
+    const t = Date.now() / 280;
+    for (let i = 0; i < sparks; i++) {
+      const a = (Math.PI * 2 * i / sparks) + t;
+      const sx = duck.x + 32 + Math.cos(a) * 34;
+      const sy = duck.y + 24 + Math.sin(a) * 26;
+      ctx.fillStyle = '#FFD700';
+      ctx.shadowBlur  = 8;
+      ctx.shadowColor = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -281,7 +306,6 @@ export function drawCrosshair(ctx, x, y, state) {
 // ─── Particles ───────────────────────────────────────────────────
 export function drawParticles(ctx, particles) {
   particles.forEach(p => {
-    const alpha = p.timer / (p.timer + 0.0001); // always visible while alive
     ctx.save();
     ctx.globalAlpha = Math.min(1, p.timer * 3.5);
     ctx.fillStyle   = p.color;
@@ -292,6 +316,67 @@ export function drawParticles(ctx, particles) {
     ctx.fill();
     ctx.restore();
   });
+}
+
+// ─── Time freeze power-up icon ────────────────────────────────────
+export function drawFreezePowerup(ctx, fp) {
+  if (!fp) return;
+  const { x, y, timer } = fp;
+  const pulse = 0.85 + 0.15 * Math.sin(Date.now() / 220);
+  const fade  = Math.min(1, timer / 1.0);   // fade out in last 1s
+
+  ctx.save();
+  ctx.globalAlpha = fade;
+  ctx.shadowBlur  = 18 * pulse;
+  ctx.shadowColor = '#00CCFF';
+
+  // Outer ring
+  ctx.strokeStyle = '#00CCFF';
+  ctx.lineWidth   = 2.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 22 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Fill
+  ctx.fillStyle = 'rgba(0, 180, 255, 0.18)';
+  ctx.beginPath();
+  ctx.arc(x, y, 22 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snowflake symbol
+  ctx.strokeStyle = '#AAEEFF';
+  ctx.lineWidth   = 2;
+  ctx.shadowBlur  = 0;
+  for (let i = 0; i < 6; i++) {
+    const a  = (Math.PI / 3) * i;
+    const r1 = 5, r2 = 16 * pulse;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+    ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+
+  // Label
+  ctx.fillStyle = '#AAEEFF';
+  ctx.font      = '7px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('FREEZE', x, y + 36);
+
+  ctx.restore();
+}
+
+// ─── Freeze screen overlay (blue tint when active) ────────────────
+export function drawFreezeOverlay(ctx, freezeTimer, CW, CH) {
+  if (freezeTimer <= 0) return;
+  const alpha = Math.min(0.22, freezeTimer * 0.05);
+  ctx.save();
+  ctx.fillStyle = `rgba(0, 160, 255, ${alpha})`;
+  ctx.fillRect(0, 0, CW, CH);
+  // Remaining time bar at top
+  const barW = (freezeTimer / 5.0) * CW;
+  ctx.fillStyle = 'rgba(0, 200, 255, 0.5)';
+  ctx.fillRect(0, 0, barW, 4);
+  ctx.restore();
 }
 
 // ─── Floating score texts ─────────────────────────────────────────

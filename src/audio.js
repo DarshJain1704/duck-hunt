@@ -57,7 +57,7 @@ class AudioEngine {
         events: {
           'onReady': () => {
             this.ytReady = true;
-            this.ytPlayer.setVolume(40);   // BGM at 40% volume
+            this.ytPlayer.setVolume(15);   // BGM at 40% volume
             if (this.bgmPlaying) {
               if (this.bgmMuted) {
                 this.ytPlayer.mute();
@@ -196,10 +196,10 @@ class AudioEngine {
     if (this.sfxMuted) return;
     const t = this.ctx.currentTime;
     // Bright ascending arpeggio — C5 → E5 → G5 → C6
-    this._tone(523, 'square', t,        0.09, 0.4);
+    this._tone(523, 'square', t, 0.09, 0.4);
     this._tone(659, 'square', t + 0.09, 0.09, 0.4);
     this._tone(784, 'square', t + 0.18, 0.09, 0.4);
-    this._tone(1047,'square', t + 0.27, 0.18, 0.35);
+    this._tone(1047, 'square', t + 0.27, 0.18, 0.35);
   }
 
   playMiss() {
@@ -207,7 +207,7 @@ class AudioEngine {
     if (this.sfxMuted) return;
     const t = this.ctx.currentTime;
     // Descending sad tones + noise rumble
-    this._tone(330, 'square', t,        0.12, 0.3);
+    this._tone(330, 'square', t, 0.12, 0.3);
     this._tone(247, 'square', t + 0.12, 0.12, 0.3);
     this._tone(196, 'square', t + 0.24, 0.20, 0.3);
     this._noise(t, 0.45, 0.12);
@@ -246,6 +246,34 @@ class AudioEngine {
     if (this.sfxMuted) return;
     const t = this.ctx.currentTime;
     this._bend(600, 1200, 'square', t, 0.12, 0.3);
+  }
+
+  /** Dog scared yelp — descending whimper */
+  playDogScared() {
+    this._ensure();
+    if (this.sfxMuted) return;
+    const t = this.ctx.currentTime;
+    this._bend(800, 200, 'square', t,        0.15, 0.35);
+    this._bend(600, 150, 'square', t + 0.15, 0.15, 0.25);
+  }
+
+  /** Time freeze activation — icy descending sweep */
+  playTimeFreeze() {
+    this._ensure();
+    if (this.sfxMuted) return;
+    const t = this.ctx.currentTime;
+    const notes = [1046, 880, 784, 659, 523, 392];
+    notes.forEach((f, i) => this._tone(f, 'square', t + i * 0.07, 0.10, 0.30));
+    this._noise(t + 0.1, 0.5, 0.08);
+  }
+
+  /** Combo legend fanfare — 7-note triumphant ascent */
+  playComboLegend() {
+    this._ensure();
+    if (this.sfxMuted) return;
+    const t = this.ctx.currentTime;
+    const fanfare = [523, 659, 784, 1047, 784, 1047, 1319];
+    fanfare.forEach((f, i) => this._tone(f, 'square', t + i * 0.10, 0.12, 0.45));
   }
 }
 
