@@ -57,6 +57,7 @@ class AudioEngine {
         events: {
           'onReady': () => {
             this.ytReady = true;
+            this.ytPlayer.setVolume(40);   // BGM at 40% volume
             if (this.bgmPlaying) {
               if (this.bgmMuted) {
                 this.ytPlayer.mute();
@@ -96,6 +97,7 @@ class AudioEngine {
       if (this.bgmMuted) {
         this.ytPlayer.mute();
       } else {
+        this.ytPlayer.setVolume(40);   // ensure 40% volume
         this.ytPlayer.unMute();
         this.ytPlayer.playVideo();
       }
