@@ -186,6 +186,7 @@ export function drawDuck(ctx, duck) {
 // ─── Crosshair ───────────────────────────────────────────────────
 const CROSSHAIR_COLORS = {
   ACTIVE:    { ring: '#00FF41', inner: 'rgba(0,255,65,0.12)',   glow: '#00FF41' },
+  ARMING:    { ring: '#FFA500', inner: 'rgba(255,165,0,0.10)',  glow: '#FFA500' },
   NO_HAND:   { ring: '#FF4444', inner: 'rgba(255,68,68,0.15)',  glow: '#FF4444' },
   NO_PISTOL: { ring: '#666666', inner: 'rgba(80,80,80,0.10)',   glow: 'transparent' },
   FIRING:    { ring: '#FFD700', inner: 'rgba(255,215,0,0.25)',  glow: '#FFD700' },
@@ -264,6 +265,15 @@ export function drawCrosshair(ctx, x, y, state) {
     const textX = Math.max(70, Math.min(CW - 70, x));
     const textY = y + R + 18 > CH - 15 ? y - R - 12 : y + R + 18;
     ctx.fillText('MAKE GUN GESTURE', textX, textY);
+    ctx.restore();
+  } else if (state === 'ARMING') {
+    ctx.save();
+    ctx.fillStyle = '#FFA500';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    const textX = Math.max(55, Math.min(CW - 55, x));
+    const textY = y + R + 18 > CH - 15 ? y - R - 12 : y + R + 18;
+    ctx.fillText('ARMING...', textX, textY);
     ctx.restore();
   }
 }

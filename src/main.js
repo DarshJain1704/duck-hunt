@@ -19,13 +19,6 @@ const STATES = {
   GAME_OVER:      'GAME_OVER',
 };
 
-// ─── Crosshair visual state ───────────────────────────────────────
-const XHAIR = {
-  ACTIVE:    'ACTIVE',
-  NO_HAND:   'NO_HAND',
-  NO_PISTOL: 'NO_PISTOL',
-  FIRING:    'FIRING',
-};
 
 class App {
   constructor() {
@@ -39,8 +32,7 @@ class App {
 
     this.lastTs         = 0;
     this.loadProgress   = 0;
-    this.firingTimer    = 0;
-    this.crosshairState = XHAIR.NO_HAND;
+    this.crosshairState = 'NO_HAND';
     this.currentRound   = 1;
     this.isNewHighScore = false;
     this.initError      = null;
@@ -260,22 +252,15 @@ class App {
     this.lastTs = ts;
 
     // ── Hand tracking ───────────────────────────────────────────────
-    const landmarks = HandTracker.processFrame(this.videoEl, ts);
-    gestures.update(landmarks, ts);
+    const landmarks      = HandTracker.processFrame(this.videoEl, ts);
+    const worldLandmarks = HandTracker.getWorldLandmarks();
+    gestures.update(landmarks, ts, worldLandmarks);
 
-    const pos      = gestures.getCursorPos(CW, CH);
-    const hasHand  = gestures.getHasHand();
-    const isPistol = gestures.getIsPistol();
-    const shot     = gestures.getShotFired();
-
-    // ── Firing timer (crosshair flash) ──────────────────────────────
-    if (this.firingTimer > 0) this.firingTimer -= dt;
-
-    // ── Crosshair state ─────────────────────────────────────────────
-    if (!hasHand)               this.crosshairState = XHAIR.NO_HAND;
-    else if (!isPistol)         this.crosshairState = XHAIR.NO_PISTOL;
-    else if (this.firingTimer > 0) this.crosshairState = XHAIR.FIRING;
-    else                        this.crosshairState = XHAIR.ACTIVE;
+    const pos            = gestures.getCursorPos(CW, CH);
+    const hasHand        = gestures.getHasHand();
+    const isPistol       = gestures.getIsPistol();
+    const shot           = gestures.getShotFired();
+    this.crosshairState  = gestures.getXhairState();
 
     // ── State logic ─────────────────────────────────────────────────
     switch (this.state) {
@@ -293,7 +278,6 @@ class App {
       case STATES.PLAYING: {
         // Process shot
         if (shot && isPistol) {
-          this.firingTimer = 0.1;
           R.triggerFlash();
           audio.playShot();
 

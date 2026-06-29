@@ -10,10 +10,11 @@ const MODEL_PATH = 'https://storage.googleapis.com/mediapipe-models/hand_landmar
 
 class HandTrackerClass {
   constructor() {
-    this.landmarker    = null;
-    this.lastVideoTime = -1;
-    this.landmarks     = null;   // null = no hand detected
-    this.ready         = false;
+    this.landmarker      = null;
+    this.lastVideoTime   = -1;
+    this.landmarks       = null;   // normalized image landmarks (null = no hand)
+    this.worldLandmarks  = null;   // 3D world-space landmarks in meters
+    this.ready           = false;
   }
 
   async init() {
@@ -62,14 +63,16 @@ class HandTrackerClass {
     const results = this.landmarker.detectForVideo(videoEl, timestamp);
 
     if (results.landmarks && results.landmarks.length > 0) {
-      this.landmarks = results.landmarks[0];
+      this.landmarks      = results.landmarks[0];
+      this.worldLandmarks = results.worldLandmarks?.[0] ?? null;
     } else {
-      this.landmarks = null;
+      this.landmarks      = null;
+      this.worldLandmarks = null;
     }
     return this.landmarks;
   }
 
-  getLandmarks() { return this.landmarks; }
+  getWorldLandmarks() { return this.worldLandmarks; }
 }
 
 export const HandTracker = new HandTrackerClass();
