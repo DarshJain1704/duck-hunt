@@ -586,8 +586,8 @@ export function drawMenuScreen(ctx, highScore) {
   // Instructions
   ctx.fillStyle = '#7A8BA0';
   ctx.font      = '7px "Press Start 2P", monospace';
-  ctx.fillText('HOLD UP INDEX FINGER LIKE A GUN', CW / 2, 248);
-  ctx.fillText('SNAP THUMB OR JERK UP  →  SHOOT', CW / 2, 268);
+  ctx.fillText('POINT INDEX FINGER LIKE A GUN', CW / 2, 248);
+  ctx.fillText('PINCH THUMB + INDEX TIP  →  SHOOT', CW / 2, 268);
   ctx.fillText('HIT DUCKS BEFORE THEY FLY AWAY!', CW / 2, 288);
 
   // Blinking prompt
@@ -596,7 +596,7 @@ export function drawMenuScreen(ctx, highScore) {
     ctx.font      = '10px "Press Start 2P", monospace';
     ctx.shadowBlur  = 8;
     ctx.shadowColor = '#00FF41';
-    ctx.fillText('▼  CLICK START BELOW  ▼', CW / 2, 340);
+    ctx.fillText('▼  AIM & SHOOT OR CLICK  ▼', CW / 2, 340);
     ctx.shadowBlur  = 0;
   }
 }
