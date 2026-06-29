@@ -586,7 +586,7 @@ export function drawMenuScreen(ctx, highScore) {
   // Instructions
   ctx.fillStyle = '#7A8BA0';
   ctx.font      = '7px "Press Start 2P", monospace';
-  ctx.fillText('POINT INDEX FINGER LIKE A GUN', CW / 2, 248);
+  ctx.fillText('POINT YOUR INDEX FINGER UP', CW / 2, 248);
   ctx.fillText('PINCH THUMB + INDEX TIP  →  SHOOT', CW / 2, 268);
   ctx.fillText('HIT DUCKS BEFORE THEY FLY AWAY!', CW / 2, 288);
 

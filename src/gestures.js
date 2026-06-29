@@ -20,8 +20,8 @@ const PINCH_FRAMES   = 3;      // consecutive frames pinch must hold to fire (~5
 // Pinch thresholds — tried in priority order:
 //   World (metres): real physical distance; best, immune to depth
 //   Norm ratio    : dist(L4,L8)/palmSize; fallback when world unavailable
-const PINCH_WORLD_M  = 0.040;  // 4 cm in world space  ← tune if needed
-const PINCH_NORM_R   = 0.28;   // 28% of palm length   ← tune if needed
+const PINCH_WORLD_M  = 0.020;  // 2 cm in world space  ← deliberate touch, above jitter noise
+const PINCH_NORM_R   = 0.14;   // 14% of palm length   ← normalized fallback
 
 // Crosshair states (exported for renderer)
 export const XHAIR = {
@@ -80,13 +80,8 @@ class GestureController {
     const L0  = landmarks[0];   // WRIST
     const L4  = landmarks[4];   // THUMB TIP       ← trigger
     const L5  = landmarks[5];   // INDEX MCP       ← AIM POINT (stable during pinch)
-    const L8  = landmarks[8];   // INDEX TIP       ← pinch reference
-    const L9  = landmarks[9];   // MIDDLE MCP
-    const L12 = landmarks[12];  // MIDDLE TIP
-    const L13 = landmarks[13];  // RING MCP
-    const L16 = landmarks[16];  // RING TIP
-    const L17 = landmarks[17];  // PINKY MCP
-    const L20 = landmarks[20];  // PINKY TIP
+    const L8  = landmarks[8];   // INDEX TIP       ← pinch reference & extension check
+    const L9  = landmarks[9];   // MIDDLE MCP      ← palm size reference
 
     // ── AIM: track index knuckle (L5) — not fingertip ──────────────
     // The knuckle doesn't move when you bring your thumb in for a pinch,
@@ -96,13 +91,11 @@ class GestureController {
     this.cursorY += (L5.y   - this.cursorY) * LERP_FACTOR;
 
     // ── PISTOL GATE ─────────────────────────────────────────────────
-    // Index extended + middle/ring/pinky curled.
-    // Thumb is deliberately excluded — it's the trigger variable.
-    const indexExtended = (L5.y - L8.y) > 0.08;
-    const middleClosed  = L12.y > L9.y  - 0.03;
-    const ringClosed    = L16.y > L13.y - 0.03;
-    const pinkyClosed   = L20.y > L17.y - 0.03;
-    this.isPistol = indexExtended && middleClosed && ringClosed && pinkyClosed;
+    // Only requirement: index finger clearly extended.
+    // Other fingers (middle/ring/pinky/thumb) are ignored —
+    // the ARMED state + pinch threshold handle all false-positive prevention.
+    const indexExtended = (L5.y - L8.y) > 0.10;  // tighter than before (was 0.08)
+    this.isPistol = indexExtended;
 
     if (!this.isPistol) {
       this._pistolStartMs = 0;

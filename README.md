@@ -20,9 +20,9 @@ The game is deployed and fully playable on GitHub Pages!
 
 | Action | How to do it |
 | :--- | :--- |
-| **Pistol Pose** | Extend your **index finger** upward. Curl your middle, ring & pinky fingers in. Thumb is free. |
+| **Pistol Pose** | Simply **point your index finger** up or forward. Other fingers can be in any position. |
 | **Aim** | Move your hand — the crosshair tracks your index knuckle. It's mirrored (move right → crosshair goes right). |
-| **Shoot** | Lightly **pinch** your thumb tip to your index fingertip. That's it — no need to snap hard. |
+| **Shoot** | Lightly **pinch** your thumb tip to your index fingertip. That's it — no snapping needed. |
 
 ### Crosshair colour guide
 
